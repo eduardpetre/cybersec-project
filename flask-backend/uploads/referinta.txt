@@ -1,0 +1,35 @@
+- sisteme de recomandare 4/3/24
+https://cismigiuparc.ro/ce-sunt-sistemele-de-recomandare/
+
+- boom domeniu imobiliare 4/3/24
+https://romania.europalibera.org/a/imobiliare-2021-2022/31633233.html 
+
+- statistici preturi chirii
+https://www.storia.ro/blog/newsroom/stiri/analiza-storia-chiriile-in-bucuresti-au-crescut-cu-19-de-la-un-an-la-altul-care-este-pretul-mediu-in-principalele-orase-din-tara
+
+
+- lucrari stiintifice
+https://www.mdpi.com/2076-3417/11/16/7502
+
+https://jtec.utem.edu.my/jtec/article/view/979/569
+
+https://ieeexplore.ieee.org/abstract/document/9422813
+
+https://www.mdpi.com/2220-9964/11/3/178
+
+https://www.dline.info/fpaper/jdim/v18i2/jdimv18i2_3.pdf
+
+
+1. Introduction
+2. Related Work 
+- Recommender Systems 
+- Methods of Recommender Systems
+- Proposed method
+- Challanges/ Problems
+3. Implementstion Design
+4. Results
+5. Conclusion
+
+https://github.com/eric8395/airbnb_recommendations
+https://www.kaggle.com/code/rdaldian/airbnb-content-based-recommendation-system
+https://github.com/DeveloperManisha/Airbnb-Recommendation-System?tab=readme-ov-file
