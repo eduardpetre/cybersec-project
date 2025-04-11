@@ -14,7 +14,11 @@ const Login = () => {
       if (response.status === 200) {
         console.log(response)
         // Redirect to profile page if login is successful
-        navigate(`/dashboard/${response.data.id}`);  // Redirecting to profile page (e.g., /profile/123)
+        if (response.data.username === 'admin') {
+          navigate(`/admin`);  // Redirecting to admin page (e.g., /admin)
+        } else {
+          navigate(`/dashboard/${response.data.id}`);  // Redirecting to profile page (e.g., /profile/123)
+        }
       }
     } catch (error) {
       console.error('Login failed:', error);

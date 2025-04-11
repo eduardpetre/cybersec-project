@@ -20,7 +20,7 @@ const Dashboard = () => {
       idParagraph.innerHTML = `User ID: ${user.id}`; // Display the user ID in the paragraph element
 
       const usernameParagraph = document.getElementById('username');
-      usernameParagraph.innerHTML = `Hello, ${user.username}!`; // Display the username in the paragraph element
+      usernameParagraph.innerHTML = `Hello, user - ${user.username}!`; // Display the username in the paragraph element
     }
   }, [user]); // Re-run effect when user data changes
 

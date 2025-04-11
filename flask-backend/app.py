@@ -65,9 +65,26 @@ def login():
     conn.close()
     
     if user:
-        return redirect('/dashboard/' + str(user[0]))  # Redirect to profile page on successful login
+        if (user[1] == "admin"):
+            return redirect('/admin')
+        else:
+            return redirect('/dashboard/' + str(user[0]))  # Redirect to profile page on successful login
     else:
         return jsonify({"message": "Invalid credentials"}), 401
+    
+# Vulnerable login endpoint
+@app.route('/admin', methods=['GET'])
+def admin():
+    conn = sqlite3.connect('app.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = ?", ("admin",))
+    user = cursor.fetchone()
+    conn.close()
+    print(user)
+    if user:
+        return jsonify({"id": user[0], "username": user[1]}), 200
+    else:
+        return jsonify({"message": "User not found"}), 404
 
 # Vulnerable profile endpoint (IDOR)
 @app.route('/dashboard/<id>', methods=['GET'])
