@@ -18,7 +18,8 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 def init_db():
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL") 
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS users 
                      (id INTEGER PRIMARY KEY, 
@@ -40,7 +41,7 @@ def verify_session_cookie():
     if not session_id:
         return None
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM sessions WHERE session_id = ? AND expires_at > datetime('now')", (session_id,))
     result = cursor.fetchone()
@@ -52,7 +53,7 @@ def create_session(user_id, response):
     session_id = secrets.token_hex(32)
     expires_at = "datetime('now', '+1 day')" 
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, ?)", 
                   (session_id, user_id, expires_at))
@@ -67,12 +68,13 @@ def create_session(user_id, response):
         samesite='Lax', 
         max_age=86400  
     )
+
     return response
 
 def clear_session(response):
     session_id = request.cookies.get('session_id')
     if session_id:
-        conn = sqlite3.connect('app.db')
+        conn = sqlite3.connect('app.db', check_same_thread=False)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
         conn.commit()
@@ -92,7 +94,7 @@ def register():
     
     hashed_password = generate_password_hash(password)
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
@@ -118,13 +120,13 @@ def login():
     username = request.form['username']
     password = request.form['password']
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+    cursor.execute(f"SELECT * FROM users WHERE username = '{username}' and password = '{password}'")
     user = cursor.fetchone()
     conn.close()
     
-    if user and check_password_hash(user[2], password):
+    if user:
         response = redirect('/dashboard') if user[1] != "admin" else redirect('/admin')
         return create_session(user[0], response)
     else:
@@ -141,7 +143,7 @@ def admin():
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = cursor.fetchone()
@@ -158,7 +160,7 @@ def dashboard(id):
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (id,))
     user = cursor.fetchone()
@@ -175,7 +177,7 @@ def dashboard_no_id():
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = cursor.fetchone()
@@ -193,7 +195,7 @@ def profile(id):
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
     
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (id,))
     user = cursor.fetchone()
@@ -223,7 +225,7 @@ def edit_profile():
         picture_filename = picture.filename
         picture.save(os.path.join(app.config['UPLOAD_FOLDER'], picture_filename))
 
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     if new_password:
         hashed_password = generate_password_hash(new_password)
