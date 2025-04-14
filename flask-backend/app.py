@@ -1,11 +1,16 @@
-from flask import Flask, request, jsonify, render_template, redirect, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, make_response, session
 import sqlite3
 from flask_cors import CORS
 import os
+from werkzeug.security import generate_password_hash, check_password_hash  # For password hashing
+import secrets  # For generating secure session tokens
 
 app = Flask(__name__)
-CORS(app)
-CORS(app, origins=["http://localhost:3000"])
+CORS(app, supports_credentials=True)  # Enable credentials for CORS
+CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+
+# Configure secret key for session encryption
+app.secret_key = secrets.token_hex(32)  # Random 32-byte key for session security
 
 # Set up file upload directory
 UPLOAD_FOLDER = 'uploads'
@@ -19,20 +24,84 @@ if not os.path.exists(UPLOAD_FOLDER):
 def init_db():
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
-    # cursor.execute('''DROP TABLE users''')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, profile_pic TEXT)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users 
+                     (id INTEGER PRIMARY KEY, 
+                      username TEXT UNIQUE, 
+                      password TEXT, 
+                      profile_pic TEXT)''')
+    
+    # Create sessions table for cookie-based authentication
+    cursor.execute('''CREATE TABLE IF NOT EXISTS sessions
+                     (session_id TEXT PRIMARY KEY,
+                      user_id INTEGER,
+                      expires_at DATETIME,
+                      FOREIGN KEY(user_id) REFERENCES users(id))''')
+    
     conn.commit()
     conn.close()
+
+# Helper function to verify session cookie
+def verify_session_cookie():
+    session_id = request.cookies.get('session_id')
+    if not session_id:
+        return None
+    
+    conn = sqlite3.connect('app.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM sessions WHERE session_id = ? AND expires_at > datetime('now')", (session_id,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    return result[0] if result else None
+
+# Helper function to create session
+def create_session(user_id, response):
+    session_id = secrets.token_hex(32)
+    expires_at = "datetime('now', '+1 day')"  # 1 day expiration
+    
+    conn = sqlite3.connect('app.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, ?)", 
+                  (session_id, user_id, expires_at))
+    conn.commit()
+    conn.close()
+    
+    # Set secure HTTP-only cookie
+    response.set_cookie(
+        'session_id',
+        value=session_id,
+        httponly=True,
+        secure=True,  # In production, set this to True for HTTPS only
+        samesite='Lax',  # Helps prevent CSRF
+        max_age=86400  # 1 day in seconds
+    )
+    return response
+
+# Helper function to clear session
+def clear_session(response):
+    session_id = request.cookies.get('session_id')
+    if session_id:
+        conn = sqlite3.connect('app.db')
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+        conn.commit()
+        conn.close()
+    
+    response.delete_cookie('session_id')
+    return response
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# Vulnerable registration endpoint
 @app.route('/register', methods=['POST'])
 def register():
     username = request.form['username']
-    password = request.form['password']  # No hashing or validation
+    password = request.form['password']
+    
+    # Hash the password before storing
+    hashed_password = generate_password_hash(password)
+    
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
 
@@ -41,7 +110,7 @@ def register():
     if user:
         return jsonify({"message": "User already exists"}), 400
 
-    cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+    cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
     conn.commit()
 
     cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
@@ -49,82 +118,108 @@ def register():
     conn.close()
 
     if user:
-        return redirect('/dashboard/' + str(user[0]))  # Redirect to profile page on successful register
+        response = redirect('/dashboard/' + str(user[0]))
+        return create_session(user[0], response)
     else:
         return jsonify({"message": "User registration failed"}), 400
 
-# Vulnerable login endpoint
 @app.route('/login', methods=['POST'])
 def login():
     username = request.form['username']
     password = request.form['password']
+    
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'")
+    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
     user = cursor.fetchone()
     conn.close()
     
-    if user:
-        if (user[1] == "admin"):
-            return redirect('/admin')
-        else:
-            return redirect('/dashboard/' + str(user[0]))  # Redirect to profile page on successful login
+    if user and check_password_hash(user[2], password):
+        response = redirect('/dashboard/' + str(user[0])) if user[1] != "admin" else redirect('/admin')
+        return create_session(user[0], response)
     else:
         return jsonify({"message": "Invalid credentials"}), 401
-    
-# Vulnerable login endpoint
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    response = jsonify({"message": "Logged out successfully"})
+    return clear_session(response)
+
 @app.route('/admin', methods=['GET'])
 def admin():
+    # Check session first
+    user_id = verify_session_cookie()
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", ("admin",))
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = cursor.fetchone()
     conn.close()
-    print(user)
-    if user:
+    
+    if user and user[1] == "admin":
         return jsonify({"id": user[0], "username": user[1]}), 200
     else:
-        return jsonify({"message": "User not found"}), 404
+        return jsonify({"message": "Unauthorized"}), 403
 
-# Vulnerable profile endpoint (IDOR)
 @app.route('/dashboard/<id>', methods=['GET'])
 def dashboard(id):
+    # Check session first
+    user_id = verify_session_cookie()
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    # Optional: Verify the requested id matches the logged-in user
+    # if int(id) != user_id:
+    #     return jsonify({"message": "Unauthorized"}), 403
+    
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (id,))
     user = cursor.fetchone()
     conn.close()
-    print(user)
+    
     if user:
         return jsonify({"id": user[0], "username": user[1]}), 200
     else:
         return jsonify({"message": "User not found"}), 404
 
-# Vulnerable profile endpoint (IDOR)
 @app.route('/profile/<id>', methods=['GET'])
 def profile(id):
+    # Check session first
+    user_id = verify_session_cookie()
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (id,))
     user = cursor.fetchone()
     conn.close()
-    print(user)
+    
     if user:
         return jsonify({"id": user[0], "username": user[1], "profile_pic": user[3]}), 200
     else:
         return jsonify({"message": "User not found"}), 404
 
-# Vulnerable edit profile endpoint: uploading a picture and changing password
 @app.route('/profile', methods=['POST'])
 def edit_profile():
-    id = request.form['id']  # For demo purposes, user ID comes as form data
-    new_password = request.form.get('new_password', None)  # If provided, change password
+    # Check session first
+    user_id = verify_session_cookie()
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    id = request.form['id']
+    
+    # Verify the user is editing their own profile
+    if int(id) != user_id:
+        return jsonify({"message": "Unauthorized"}), 403
+    
+    new_password = request.form.get('new_password', None)
     picture = request.files.get('picture', None)
     picture_filename = None
 
-    print(id, new_password, picture)
-
-    # Vulnerability: No strict validation on file type if you purposefully allow any file
     if picture:
         picture_filename = picture.filename
         picture.save(os.path.join(app.config['UPLOAD_FOLDER'], picture_filename))
@@ -132,10 +227,10 @@ def edit_profile():
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
     if new_password:
-        # Update password vulnerably: no hashing
-        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_password, id))
+        # Now hashing the new password
+        hashed_password = generate_password_hash(new_password)
+        cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_password, id))
     if picture_filename:
-        # Save filename in profile_pic field
         cursor.execute("UPDATE users SET profile_pic = ? WHERE id = ?", (picture_filename, id))
     conn.commit()
     conn.close()
@@ -148,11 +243,10 @@ def collect():
     print("Exfiltrated data:", data)
     return "Data received", 200
 
-# Serve files from the uploads folder
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-    init_db()  # Initialize the database when starting the app
+    init_db()
     app.run(debug=True)
