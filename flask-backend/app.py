@@ -2,25 +2,21 @@ from flask import Flask, request, jsonify, render_template, redirect, send_from_
 import sqlite3
 from flask_cors import CORS
 import os
-from werkzeug.security import generate_password_hash, check_password_hash  # For password hashing
-import secrets  # For generating secure session tokens
+from werkzeug.security import generate_password_hash, check_password_hash 
+import secrets  
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)  # Enable credentials for CORS
+CORS(app, supports_credentials=True) 
 CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
 
-# Configure secret key for session encryption
-app.secret_key = secrets.token_hex(32)  # Random 32-byte key for session security
+app.secret_key = secrets.token_hex(32)  
 
-# Set up file upload directory
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Ensure the upload directory exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Database setup (in-memory SQLite for simplicity)
 def init_db():
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
@@ -30,7 +26,6 @@ def init_db():
                       password TEXT, 
                       profile_pic TEXT)''')
     
-    # Create sessions table for cookie-based authentication
     cursor.execute('''CREATE TABLE IF NOT EXISTS sessions
                      (session_id TEXT PRIMARY KEY,
                       user_id INTEGER,
@@ -40,7 +35,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Helper function to verify session cookie
 def verify_session_cookie():
     session_id = request.cookies.get('session_id')
     if not session_id:
@@ -54,10 +48,9 @@ def verify_session_cookie():
     
     return result[0] if result else None
 
-# Helper function to create session
 def create_session(user_id, response):
     session_id = secrets.token_hex(32)
-    expires_at = "datetime('now', '+1 day')"  # 1 day expiration
+    expires_at = "datetime('now', '+1 day')" 
     
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
@@ -66,18 +59,16 @@ def create_session(user_id, response):
     conn.commit()
     conn.close()
     
-    # Set secure HTTP-only cookie
     response.set_cookie(
         'session_id',
         value=session_id,
         httponly=True,
-        secure=True,  # In production, set this to True for HTTPS only
-        samesite='Lax',  # Helps prevent CSRF
-        max_age=86400  # 1 day in seconds
+        secure=True,  
+        samesite='Lax', 
+        max_age=86400  
     )
     return response
 
-# Helper function to clear session
 def clear_session(response):
     session_id = request.cookies.get('session_id')
     if session_id:
@@ -99,7 +90,6 @@ def register():
     username = request.form['username']
     password = request.form['password']
     
-    # Hash the password before storing
     hashed_password = generate_password_hash(password)
     
     conn = sqlite3.connect('app.db')
@@ -118,7 +108,7 @@ def register():
     conn.close()
 
     if user:
-        response = redirect('/dashboard/' + str(user[0]))
+        response = redirect('/dashboard')
         return create_session(user[0], response)
     else:
         return jsonify({"message": "User registration failed"}), 400
@@ -135,7 +125,7 @@ def login():
     conn.close()
     
     if user and check_password_hash(user[2], password):
-        response = redirect('/dashboard/' + str(user[0])) if user[1] != "admin" else redirect('/admin')
+        response = redirect('/dashboard') if user[1] != "admin" else redirect('/admin')
         return create_session(user[0], response)
     else:
         return jsonify({"message": "Invalid credentials"}), 401
@@ -147,7 +137,6 @@ def logout():
 
 @app.route('/admin', methods=['GET'])
 def admin():
-    # Check session first
     user_id = verify_session_cookie()
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
@@ -165,18 +154,30 @@ def admin():
 
 @app.route('/dashboard/<id>', methods=['GET'])
 def dashboard(id):
-    # Check session first
     user_id = verify_session_cookie()
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
     
-    # Optional: Verify the requested id matches the logged-in user
-    # if int(id) != user_id:
-    #     return jsonify({"message": "Unauthorized"}), 403
-    
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (id,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if user:
+        return jsonify({"id": user[0], "username": user[1]}), 200
+    else:
+        return jsonify({"message": "User not found"}), 404
+
+@app.route('/dashboard', methods=['GET'])
+def dashboard_no_id():
+    user_id = verify_session_cookie()
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+    
+    conn = sqlite3.connect('app.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = cursor.fetchone()
     conn.close()
     
@@ -205,14 +206,12 @@ def profile(id):
 
 @app.route('/profile', methods=['POST'])
 def edit_profile():
-    # Check session first
     user_id = verify_session_cookie()
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
     
     id = request.form['id']
     
-    # Verify the user is editing their own profile
     if int(id) != user_id:
         return jsonify({"message": "Unauthorized"}), 403
     
@@ -227,7 +226,6 @@ def edit_profile():
     conn = sqlite3.connect('app.db')
     cursor = conn.cursor()
     if new_password:
-        # Now hashing the new password
         hashed_password = generate_password_hash(new_password)
         cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_password, id))
     if picture_filename:

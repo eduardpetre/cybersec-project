@@ -66,7 +66,7 @@ const Login = () => {
 
         if (response.data?.redirect) {
           navigate(response.data.redirect);
-        } else if (username === 'admin') {
+        } else if (username === 'admin1') {
           navigate('/admin');
         } else {
           navigate('/dashboard');
@@ -232,7 +232,6 @@ const Login = () => {
         <div style={styles.sessionInfo}>
           Current Session ID: {getSessionId() || 'None'}
           <br />
-          <small>Note: Actual authentication now uses secure HTTP-only cookies</small>
         </div>
       </div>
     </div>

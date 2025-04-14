@@ -19,7 +19,7 @@ const Dashboard = () => {
           return;
         }
 
-        const response = await axios.get(`http://localhost:5000/dashboard/${userId}`, {
+        const response = await axios.get('http://localhost:5000/dashboard', {
           withCredentials: true
         });
 
