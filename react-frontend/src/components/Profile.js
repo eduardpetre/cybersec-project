@@ -22,11 +22,6 @@ const Profile = () => {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         const userId = currentUser.id;
 
-        if (!userId) {
-          navigate('/login');
-          return;
-        }
-
         const response = await axios.get(`http://localhost:5000/profile/${userId}`, {
           withCredentials: true 
         });

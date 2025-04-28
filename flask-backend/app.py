@@ -66,9 +66,8 @@ def create_session(user_id, response):
     response.set_cookie(
         'session_id',
         value=session_id,
-        httponly=True,
-        secure=True,  
-        samesite='Lax', 
+        httponly=False,
+        secure=True,   
         max_age=86400  
     )
 

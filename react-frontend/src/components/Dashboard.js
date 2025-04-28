@@ -11,14 +11,6 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        const userId = currentUser.id;
-
-        if (!userId) {
-          navigate('/login');
-          return;
-        }
-
         const response = await axios.get('http://localhost:5000/dashboard', {
           withCredentials: true
         });
@@ -44,6 +36,22 @@ const Dashboard = () => {
   const handleRedirect = () => {
     if (user) {
       navigate(`/profile/${user.id}`);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/logout', {}, {
+        withCredentials: true
+      });
+
+      if (response.status === 200) {
+        localStorage.removeItem('currentUser');
+        navigate('/login');
+      }
+    } catch (err) {
+      console.error('Error during logout:', err);
+      setError('Failed to logout');
     }
   };
 
@@ -103,7 +111,19 @@ const Dashboard = () => {
     error: {
       fontSize: '18px',
       color: '#d32f2f',
-    }
+    },
+    logoutButton: {
+      padding: '12px 24px',
+      backgroundColor: '#f44336',
+      color: 'white',
+      border: 'none',
+      borderRadius: '4px',
+      fontSize: '16px',
+      cursor: 'pointer',
+      marginTop: '20px',
+      marginLeft: '10px',
+      transition: 'background-color 0.3s',
+    },
   };
 
   if (loading) {
@@ -151,6 +171,13 @@ const Dashboard = () => {
             >
               View Profile
             </button>
+
+            <button
+                style={styles.logoutButton}
+                onClick={handleLogout}
+              >
+                Disconnect
+              </button>
           </>
         )}
       </div>
