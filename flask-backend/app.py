@@ -4,6 +4,8 @@ from flask_cors import CORS
 import os
 from werkzeug.security import generate_password_hash, check_password_hash 
 import secrets  
+import base64
+import hashlib
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True) 
@@ -25,7 +27,8 @@ def init_db():
                      (id INTEGER PRIMARY KEY, 
                       username TEXT UNIQUE, 
                       password TEXT, 
-                      profile_pic TEXT)''')
+                      profile_pic TEXT,
+                      name TEXT)''')
     
     cursor.execute('''CREATE TABLE IF NOT EXISTS sessions
                      (session_id TEXT PRIMARY KEY,
@@ -87,12 +90,31 @@ def clear_session(response):
 def home():
     return render_template('index.html')
 
+def hash_password(password: str) -> str:
+    salt = os.urandom(16)
+    pepper = os.urandom(8)
+    key = os.urandom(1)[0]
+    password = password.encode('utf-8')
+    password = bytes([(b ^ salt[i % len(salt)]) for i, b in enumerate(password)])
+    password = base64.b64encode(password)
+    password = bytes([((b << 3) & 0xFF) | (b >> 5) for b in password])
+    password = bytes([b ^ pepper[i % len(pepper)] for i, b in enumerate(password)])
+    password = password[::-1]
+    hashlib.sha256(password).digest()
+    password = password[::-1]
+    password = bytes([b ^ pepper[i % len(pepper)] for i, b in enumerate(password)]) 
+    password = bytes([((b >> 3) & 0x1F) | (b << 5 & 0xFF) for b in password])
+    password = base64.b64decode(password)
+    password = bytes([(b ^ salt[i % len(salt)]) for i, b in enumerate(password)])
+    password = password.decode('utf-8')
+    return password
+
 @app.route('/register', methods=['POST'])
 def register():
     username = request.form['username']
     password = request.form['password']
     
-    hashed_password = generate_password_hash(password)
+    hashed_password = hash_password(password)
     
     conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
@@ -167,7 +189,7 @@ def dashboard(id):
     conn.close()
     
     if user:
-        return jsonify({"id": user[0], "username": user[1]}), 200
+        return jsonify({"id": user[0], "username": user[1], "name": user[4]}), 200
     else:
         return jsonify({"message": "User not found"}), 404
 
@@ -184,7 +206,7 @@ def dashboard_no_id():
     conn.close()
     
     if user:
-        return jsonify({"id": user[0], "username": user[1]}), 200
+        return jsonify({"id": user[0], "username": user[1], "name": user[4]}), 200
     else:
         return jsonify({"message": "User not found"}), 404
 
@@ -216,7 +238,8 @@ def edit_profile():
     
     if int(id) != user_id:
         return jsonify({"message": "Unauthorized"}), 403
-    
+        
+    new_name = request.form.get('name', None)
     new_password = request.form.get('new_password', None)
     picture = request.files.get('picture', None)
     picture_filename = None
@@ -227,6 +250,8 @@ def edit_profile():
 
     conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
+    if new_name:
+        cursor.execute("UPDATE users SET name = ? WHERE id = ?", (new_name, id))
     if new_password:
         hashed_password = generate_password_hash(new_password)
         cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_password, id))

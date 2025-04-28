@@ -1,7 +1,0 @@
-xss {username = <img src=x onerror=alert('XSS') />; password = * }
-sql injection {username = *; password = ' or ''=' }
-idor localhost:3000/dashboard/id { id = * }
-invalid-input validation - can upload any type of file instead of image
-weakness in security practice - can change the password from profile and access any user's profile
-no rules for passwords, basic credentials for admin or something?
-csrf?

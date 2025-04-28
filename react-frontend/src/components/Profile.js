@@ -5,6 +5,7 @@ import axios from 'axios';
 const Profile = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
+    name: '',
     newPassword: '',
     picture: null
   });
@@ -86,6 +87,7 @@ const Profile = () => {
     const data = new FormData();
     data.append('id', user.id);
     if (formData.newPassword) data.append('new_password', formData.newPassword);
+    if (formData.name) data.append('name', formData.name);
     if (formData.picture) data.append('picture', formData.picture);
 
     try {
@@ -105,7 +107,7 @@ const Profile = () => {
         }
       }
       
-      setFormData(prev => ({ ...prev, newPassword: '' }));
+      setFormData(prev => ({ ...prev, newPassword: '', name: '' }));
       setSelectedFile(null);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -303,6 +305,18 @@ const Profile = () => {
 
         <form onSubmit={handleSubmit}>
           <div style={styles.formGroup}>
+            <label style={styles.label}>Name:</label>
+            <input
+              style={styles.input}
+              type="text"
+              name="name"
+              value={formData.name || user?.name || ''}
+              onChange={handleChange}
+              placeholder="Enter your name"
+            />
+          </div>
+
+          <div style={styles.formGroup}>
             <label style={styles.label}>New Password:</label>
             <input
               style={styles.input}
@@ -315,7 +329,7 @@ const Profile = () => {
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Profile File:</label>
+            <label style={styles.label}>Profile Picture:</label>
             <input 
               style={styles.fileInput}
               type="file" 

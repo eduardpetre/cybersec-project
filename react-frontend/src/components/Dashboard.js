@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -46,6 +46,13 @@ const Dashboard = () => {
       navigate(`/profile/${user.id}`);
     }
   };
+
+  const dashboardMessage = useRef(null);
+  useEffect(() => {
+    if (dashboardMessage.current) {
+      dashboardMessage.current.innerHTML = "Hello," + user?.name + "!";
+    }
+  }, [user]);
 
   // Styles
   const styles = {
@@ -130,7 +137,7 @@ const Dashboard = () => {
         {user && (
           <>
             <p style={styles.text}>User ID: {user.id}</p>
-            <p style={styles.text}>Hello, {user.username}!</p>
+            <p ref={dashboardMessage} style={styles.text}></p>
 
             <input
               type="hidden"
