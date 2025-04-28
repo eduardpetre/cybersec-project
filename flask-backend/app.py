@@ -1,8 +1,8 @@
+import re
 from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, make_response, session
 import sqlite3
 from flask_cors import CORS
 import os
-from werkzeug.security import generate_password_hash, check_password_hash 
 import secrets  
 import base64
 import hashlib
@@ -141,7 +141,13 @@ def register():
 def login():
     username = request.form['username']
     password = request.form['password']
-    
+
+    if not re.match(r'^[a-zA-Z0-9]+$', username):
+        return jsonify({"message": "Invalid characters in username"}), 400
+
+    if not re.match(r"^[ a-zA-Z0-9!@#$%'^&*()-_,+ ]+$", password):
+        return jsonify({"message": "Invalid characters in password"}), 400
+
     conn = sqlite3.connect('app.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute(f"SELECT * FROM users WHERE username = '{username}' and password = '{password}'")
@@ -253,7 +259,7 @@ def edit_profile():
     if new_name:
         cursor.execute("UPDATE users SET name = ? WHERE id = ?", (new_name, id))
     if new_password:
-        hashed_password = generate_password_hash(new_password)
+        hashed_password = hash_password(new_password)
         cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_password, id))
     if picture_filename:
         cursor.execute("UPDATE users SET profile_pic = ? WHERE id = ?", (picture_filename, id))

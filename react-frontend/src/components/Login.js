@@ -66,7 +66,7 @@ const Login = () => {
 
         if (response.data?.redirect) {
           navigate(response.data.redirect);
-        } else if (username === 'admin1') {
+        } else if (username === 'admin') {
           navigate('/admin');
         } else {
           navigate('/dashboard');
@@ -86,27 +86,27 @@ const Login = () => {
     }
   };
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await axios.get('http://localhost:5000/check-auth', {
-          withCredentials: true
-        });
-        if (response.data.authenticated) {
-          const userData = JSON.parse(localStorage.getItem('currentUser') || '{}');
-          if (userData.username === 'admin') {
-            navigate('/admin');
-          } else {
-            navigate('/dashboard');
-          }
-        }
-      } catch (error) {
-        console.log('Not authenticated');
-      }
-    };
+  // useEffect(() => {
+  //   const checkAuth = async () => {
+  //     try {
+  //       const response = await axios.get('http://localhost:5000/check-auth', {
+  //         withCredentials: true
+  //       });
+  //       if (response.data.authenticated) {
+  //         const userData = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  //         if (userData.username === 'admin') {
+  //           navigate('/admin');
+  //         } else {
+  //           navigate('/dashboard');
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.log('Not authenticated');
+  //     }
+  //   };
     
-    checkAuth();
-  }, [navigate]);
+  //   checkAuth();
+  // }, [navigate]);
 
   const styles = {
     container: {
